@@ -165,17 +165,10 @@ setup_env() {
         sed -i.bak "s/^# LLM_CHANNELS=.*/LLM_CHANNELS=zhipu/" .env
         sed -i.bak "/^# LLM_CHANNELS=/a\\
 LLM_ZHIPU_API_KEY=$zhipu_key\\
-LLM_ZHIPU_BASE_URL=https://open.bigmodel.cn/api/paas/v4\\
-LLM_ZHIPU_MODELS=glm-4-flash\\
+LLM_ZHIPU_BASE_URL=https://api.z.ai/api/anthropic\\
+LLM_ZHIPU_MODELS=glm-5.1\\
 LLM_ZHIPU_PROTOCOL=openai" .env
-        info "智谱 GLM-4-Flash 已配置"
-
-        prompt "是否使用 glm-4-plus（效果更好但更贵）？(y/N): "
-        read -r use_plus
-        if [[ "$use_plus" == "y" || "$use_plus" == "Y" ]]; then
-            sed -i.bak "s/LLM_ZHIPU_MODELS=.*/LLM_ZHIPU_MODELS=glm-4-plus/" .env
-            info "已切换为 glm-4-plus"
-        fi
+        info "智谱 GLM-5.1 已配置"
     fi
 
     # --- 搜索引擎 ---
