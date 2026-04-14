@@ -7,6 +7,9 @@ FROM node:20-slim AS web-builder
 
 WORKDIR /app/apps/dsa-web
 
+# 使用腾讯云 npm 镜像
+RUN npm config set registry https://mirrors.cloud.tencent.com/npm/
+
 COPY apps/dsa-web/package.json apps/dsa-web/package-lock.json ./
 RUN npm ci
 
@@ -23,6 +26,9 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
+# 使用腾讯云 Debian 镜像源
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources
+
 # 安装系统依赖（wkhtmltopdf 含 wkhtmltoimage，用于 Markdown 转图片 Issue #289）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -37,8 +43,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制依赖文件
 COPY requirements.txt .
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 使用腾讯云 PyPI 镜像安装 Python 依赖
+RUN pip install --no-cache-dir -i https://mirrors.cloud.tencent.com/pypi/simple/ --trusted-host mirrors.cloud.tencent.com -r requirements.txt
 
 # 复制应用代码
 COPY *.py ./
