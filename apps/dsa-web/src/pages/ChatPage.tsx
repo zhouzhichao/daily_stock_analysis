@@ -14,6 +14,7 @@ import {
   type ProgressStep,
 } from '../stores/agentChatStore';
 import { downloadSession, formatSessionAsMarkdown } from '../utils/chatExport';
+import { exportMessageAsImage } from '../utils/chatImageExport';
 import type { ChatFollowUpContext } from '../utils/chatFollowUp';
 import {
   buildFollowUpPrompt,
@@ -51,6 +52,7 @@ const ChatPage: React.FC = () => {
     message: string;
   } | null>(null);
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
+  const [exportingImageId, setExportingImageId] = useState<string | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
   const messagesViewportRef = useRef<HTMLDivElement>(null);
@@ -328,17 +330,38 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  const handleExportAsImage = useCallback(async (msg: Message) => {
+    const el = document.querySelector(`[data-message-prose="${msg.id}"]`) as HTMLElement | null;
+    if (!el) return;
+    setExportingImageId(msg.id);
+    try {
+      await exportMessageAsImage(el, msg.content, { skillName: msg.skillName });
+    } catch (err) {
+      console.error('Image export failed:', err);
+    } finally {
+      setExportingImageId(null);
+    }
+  }, []);
+
   const downloadMessageAsMarkdown = useCallback((msg: Message) => {
-    const heading = msg.role === 'user' ? '# 用户消息' : `# AI 回复${msg.skillName ? ` · ${msg.skillName}` : ''}`;
-    const content = [heading, '', msg.content].join('\n');
+    // Extract title from content: first # heading, or first non-empty line
+    const headingRe = /^#{1,3}\s+(.+)$/m;
+    const headingMatch = headingRe.exec(msg.content);
+    const title = headingMatch
+      ? headingMatch[1].trim()
+      : msg.content.split('\n').map((l) => l.trim()).find(Boolean) || '消息';
+
+    const skillSuffix = msg.skillName ? ` · ${msg.skillName}` : '';
+    const prefix = msg.role === 'user' ? '# 用户消息' : `# AI 回复${skillSuffix}`;
+    const content = [prefix, '', msg.content].join('\n');
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${msg.role === 'user' ? 'user' : 'assistant'}-message-${msg.id}.md`;
+    anchor.download = `${title.slice(0, 60)}.md`;
     document.body.appendChild(anchor);
     anchor.click();
-    document.body.removeChild(anchor);
+    anchor.remove();
     URL.revokeObjectURL(url);
   }, []);
 
@@ -825,8 +848,17 @@ const ChatPage: React.FC = () => {
                           >
                             导出
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportAsImage(msg)}
+                            className="chat-copy-btn"
+                            disabled={exportingImageId === msg.id}
+                            aria-label="导出此条消息为长图"
+                          >
+                            {exportingImageId === msg.id ? '导出中...' : '长图'}
+                          </button>
                         </div>
-                        <div className="chat-prose pr-20 sm:pr-24">
+                        <div className="chat-prose pr-20 sm:pr-24" data-message-prose={msg.id}>
                           <Markdown remarkPlugins={[remarkGfm]}>
                             {msg.content}
                           </Markdown>
